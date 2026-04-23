@@ -81,10 +81,12 @@ report-agent/
 │   └── scripts/                # 演示与工具脚本
 ├── frontend/                   # React + Vite
 ├── docs/
-│   └── test.rest               # REST Client 示例请求
+│   ├── test.rest               # REST Client 示例请求
+│   └── nginx-report-agent.conf.example  # 生产 Nginx 反代示例
 ├── scripts/
 │   └── start-dev.ps1           # Windows 开发启动
 ├── docker-compose.yml          # 可选本地 Mongo
+├── LICENSE                     # MIT 许可证全文
 └── README.md
 ```
 
@@ -94,6 +96,29 @@ report-agent/
 - 离线示例：`docs/test.rest`（VS Code REST Client 等插件可直接运行）。  
 - Agent 能力演示：`python backend/scripts/agent_feature_demo.py`（需后端已启动且已配置 Key）。
 
+## 提交 GitHub 前检查
+
+- **切勿**将 `backend/.env` 提交进仓库（已在 `.gitignore` 中）；只提交 `backend/.env.example`。  
+- 若 API Key 曾写入仓库、截图或聊天等**不可信环境**，请到 DeepSeek 控制台**作废并轮换**密钥。  
+- 确认 `git status` 中**没有** `.env`、`*.pem`、私钥等敏感文件被 `git add`。
+
+## 生产部署（概要）
+
+1. **服务器**安装 Python 3.11+、Node 18+（仅构建前端时需要）、MongoDB（或使用云 Mongo URI）。  
+2. **后端**：在 `backend` 目录放置 `.env`（从 `.env.example` 复制），至少配置 `MONGODB_URI`、`MONGODB_DB`、`DEEPSEEK_API_KEY`；生产建议设置 `ALLOWED_ORIGINS=https://你的前端域名`、`DOCS_ENABLED=false`。  
+3. **启动后端**（不要用 `--reload`）示例：
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8002
+```
+
+可用 systemd / supervisor 托管上述进程。
+
+4. **前端**：`cd frontend && npm ci && npm run build`，将 `frontend/dist` 部署到 Nginx 等静态站点根目录；**同一域名**下将路径 `/api` 反向代理到后端（见 `docs/nginx-report-agent.conf.example`）。当前前端请求使用相对路径 `/api`，与上述反代方式一致。  
+5. **AI Agent 多轮会话**（`session_id`）当前保存在**单进程内存**中；若 uvicorn 使用多 worker 或水平扩容，会话不会在进程间共享，需要时再改为 Redis 等存储。
+
 ## 开发说明
 
 - 后端入口模块为 **`app.main:app`**，请勿再使用已移除的根目录 `main.py`。  
@@ -102,4 +127,4 @@ report-agent/
 
 ## 许可证
 
-沿用仓库原有约定（若未指定，以项目文件为准）。
+本项目以 **[MIT License](LICENSE)** 发布，全文见仓库根目录的 `LICENSE` 文件。

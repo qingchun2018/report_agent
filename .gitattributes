@@ -1,0 +1,20 @@
+# 文本文件在仓库中统一为 LF，减少 Windows 上「LF will be replaced by CRLF」类提示，并与 Linux 服务器一致
+* text=auto
+
+*.py text eol=lf
+*.md text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.rest text eol=lf
+*.example text eol=lf
+*.ps1 text eol=lf
+
+*.svg text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

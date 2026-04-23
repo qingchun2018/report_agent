@@ -1,0 +1,23 @@
+# 示例配置：静态前端 + /api 反代到 FastAPI（复制后按需改 server_name、root、后端端口）
+# 假设前端 build 输出在 /var/www/report-agent ，后端在本机 8002
+
+server {
+    listen 80;
+    server_name your-domain.example.com;
+
+    root /var/www/report-agent;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
