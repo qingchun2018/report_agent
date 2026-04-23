@@ -1,0 +1,22 @@
+### Report Agent — 本地 API 速测（REST Client / VS Code REST）
+### 默认 BASE：http://127.0.0.1:8002
+
+@base = http://127.0.0.1:8002
+
+### OpenAPI 文档
+GET {{base}}/docs
+
+### Dashboard
+GET {{base}}/api/dashboard
+
+### AI Agent（需配置 DEEPSEEK_API_KEY）
+POST {{base}}/api/agent/chat
+Content-Type: application/json
+
+{
+  "query": "统计各严重级别的漏洞数量",
+  "session_id": "rest-demo-1"
+}
+
+### 漏洞列表
+GET {{base}}/api/vulns?limit=5

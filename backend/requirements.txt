@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+motor
+pymongo
+mongomock-motor
+openai
+python-dotenv
+apscheduler

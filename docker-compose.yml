@@ -1,0 +1,12 @@
+# 本地开发可选：仅 MongoDB（与 backend/.env 默认 MONGODB_URI 一致）
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - report_agent_mongo:/data/db
+
+volumes:
+  report_agent_mongo:
