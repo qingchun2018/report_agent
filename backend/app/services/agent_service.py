@@ -362,7 +362,15 @@ class AgentService:
         trace.append({"type": "legacy_json", "note": "工具循环未收敛，回退到 JSON 计划模式"})
         query_plan = self._parse_assistant_json_plan(content)
         if not query_plan:
-            return {"error": "AI 返回格式异常，请重试"}
+            return {
+                "query": user_query,
+                "collection": "",
+                "pipeline_explanation": "",
+                "chart_type": "table",
+                "chart_title": "能力说明",
+                "data": [],
+                "summary": "我是数据分析助手，只能处理数据查询类问题。请从上方建议列表中选择一个问题，或者输入类似「统计各严重级别的漏洞数量」这样的查询。",
+            }
         collection_name = query_plan.get("collection", "")
         pipeline = query_plan.get("pipeline", [])
         chart_type = query_plan.get("chart_type", "table")
@@ -495,7 +503,15 @@ class AgentService:
                 }
 
             trace.append({"type": "no_data", "round": round_i, "finish": finish, "hint": final_text[:300]})
-            return {"error": "未能从数据库得到有效结果，请换一种问法试试。"}
+            return {
+                "query": user_query,
+                "collection": "",
+                "pipeline_explanation": "",
+                "chart_type": "table",
+                "chart_title": "能力说明",
+                "data": [],
+                "summary": "我是数据分析助手，只能处理数据查询类问题。你可以问我：漏洞分布、版本情况、License 合规、GitHub 趋势、OpenRank 指标等。",
+            }
 
         trace.append({"type": "abort", "reason": "max_tool_rounds"})
         return {"error": "工具调用轮数过多，请简化问题后重试。"}
