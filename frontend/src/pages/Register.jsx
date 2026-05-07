@@ -30,6 +30,14 @@ export default function Register() {
       setError('两次输入的密码不一致');
       return;
     }
+    // 与后端 bcrypt 一致：按 UTF-8 字节数上限 72，避免注册时报 cryptic 英文错误
+    const pwdBytes = new TextEncoder().encode(password).length;
+    if (pwdBytes > 72) {
+      setError(
+        `密码过长：系统最多支持 72 字节（UTF-8），当前约 ${pwdBytes} 字节。若含中文，每个汉字通常占 3 字节，请缩短或使用英文与数字。`,
+      );
+      return;
+    }
     setSubmitting(true);
     try {
       await register(username.trim(), password, fullName.trim());
@@ -91,6 +99,9 @@ export default function Register() {
               className="w-full px-3 py-2 rounded-lg border border-[var(--apple-border)] focus:outline-none focus:ring-2 focus:ring-[var(--apple-blue)] text-sm"
               placeholder="至少 6 位"
             />
+            <p className="text-[10px] text-[var(--apple-text-secondary)] mt-1">
+              说明：密码按 UTF-8 累计字节数，总长不得超过 72 字节（纯英文数字约 72 个字符；纯中文约 24 个字）。
+            </p>
           </div>
 
           <div>

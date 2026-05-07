@@ -1,24 +1,39 @@
-"""鉴权工具：密码哈希（bcrypt）与 JWT 编解码。"""
+"""鉴权工具：密码哈希（bcrypt）与 JWT 编解码。
+
+密码哈希使用 bcrypt 官方 Python 包直接实现，避免 passlib 与 bcrypt 4.x 组合时
+在部分环境下对「字节长度」校验异常（短密码仍报错）的兼容性问题。
+"""
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import bcrypt
 import jwt
-from passlib.context import CryptContext
 
-# 使用 bcrypt 算法做密码哈希
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt 算法仅使用前 72 字节的 UTF-8 密码；与 schemas 中校验保持一致
+MAX_BCRYPT_PASSWORD_BYTES = 72
 
 
 def hash_password(plain_password: str) -> str:
     """对明文密码进行 bcrypt 哈希。"""
-    return _pwd_context.hash(plain_password)
+    pw = plain_password.encode("utf-8")
+    if len(pw) > MAX_BCRYPT_PASSWORD_BYTES:
+        raise ValueError(
+            "密码过长：bcrypt 最多支持 72 字节（UTF-8），请缩短密码。"
+        )
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(pw, salt)
+    return hashed.decode("ascii")
 
 
 def verify_password(plain_password: str, password_hash: str) -> bool:
-    """校验明文密码与已存哈希是否匹配。"""
+    """校验明文密码与已存哈希是否匹配（兼容此前 passlib 写入的 $2b$ 格式）。"""
     try:
-        return _pwd_context.verify(plain_password, password_hash)
+        pw = plain_password.encode("utf-8")
+        ph = password_hash.encode("utf-8") if isinstance(password_hash, str) else password_hash
+        return bcrypt.checkpw(pw, ph)
+    except (ValueError, TypeError):
+        return False
     except Exception:
         return False
 

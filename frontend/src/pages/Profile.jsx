@@ -38,6 +38,13 @@ export default function Profile() {
       toast.error('新密码不能与原密码相同');
       return;
     }
+    const newBytes = new TextEncoder().encode(newPassword).length;
+    if (newBytes > 72) {
+      toast.error(
+        `新密码过长：最多 72 字节（UTF-8），当前约 ${newBytes} 字节；若含中文请缩短或使用英文数字组合。`,
+      );
+      return;
+    }
     setSubmitting(true);
     try {
       await changePassword(oldPassword, newPassword);
@@ -118,6 +125,9 @@ export default function Profile() {
               className="w-full px-3 py-2 rounded-lg border border-[var(--apple-border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--apple-blue)] text-sm"
               placeholder="至少 6 位"
             />
+            <p className="text-[10px] text-[var(--apple-text-secondary)] mt-1">
+              新密码总长度按 UTF-8 计不得超过 72 字节（与注册规则一致）。
+            </p>
           </div>
           <div>
             <label className="block text-xs font-medium text-[var(--apple-text-secondary)] mb-1.5">

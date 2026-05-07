@@ -11,6 +11,7 @@ from app.schemas.auth import (
     RegisterBody,
     TokenResponse,
     UserOut,
+    validate_password_utf8_bytes,
 )
 from app.services.auth_service import AuthService
 from app.utils.rate_limit import login_lockout, register_limiter
@@ -67,6 +68,11 @@ async def register(body: RegisterBody, db: DatabaseDep, request: Request):
 
 async def _do_login(username: str, password: str, db) -> TokenResponse:
     """登录核心逻辑：失败计数 + 锁定。"""
+    # OAuth2 表单登录不经过 LoginBody，需同样校验 bcrypt 的 72 字节上限
+    try:
+        validate_password_utf8_bytes(password, "密码")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     key = f"login:{username.strip().lower()}"
     locked, remain = login_lockout.is_locked(key)
     if locked:

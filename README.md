@@ -88,6 +88,7 @@ report-agent/
 │   └── scripts/                # 演示与工具脚本
 ├── frontend/                   # React + Vite
 ├── docs/
+│   ├── DEPLOYMENT.md           # 生产部署步骤与环境变量说明
 │   ├── test.rest               # REST Client 示例请求
 │   └── nginx-report-agent.conf.example  # 生产 Nginx 反代示例
 ├── scripts/
@@ -110,6 +111,8 @@ report-agent/
 - 确认 `git status` 中**没有** `.env`、`*.pem`、私钥等敏感文件被 `git add`。
 
 ## 生产部署（概要）
+
+**完整步骤、环境变量说明与检查清单见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。**
 
 1. **服务器**安装 Python 3.11+、Node 18+（仅构建前端时需要）、MongoDB（或使用云 Mongo URI）。  
 2. **后端**：在 `backend` 目录放置 `.env`（从 `.env.example` 复制），至少配置 `MONGODB_URI`、`MONGODB_DB`、`DEEPSEEK_API_KEY`；生产建议设置 `ALLOWED_ORIGINS=https://你的前端域名`、`DOCS_ENABLED=false`。  

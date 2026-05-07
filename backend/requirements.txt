@@ -6,7 +6,7 @@ mongomock-motor
 openai
 python-dotenv
 apscheduler
-passlib[bcrypt]
+bcrypt>=4.1.0
 pyjwt
 python-multipart
 email-validator
