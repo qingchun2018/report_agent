@@ -13,6 +13,20 @@
   --apple-yellow: #ffcc00;
 }
 
+/* 暗色模式：通过 <html data-theme="dark"> 切换 */
+:root[data-theme="dark"] {
+  --apple-bg: #1c1c1e;
+  --apple-card: #2c2c2e;
+  --apple-border: #3a3a3c;
+  --apple-text: #f5f5f7;
+  --apple-text-secondary: #98989d;
+  --apple-blue: #0a84ff;
+  --apple-green: #30d158;
+  --apple-red: #ff453a;
+  --apple-orange: #ff9f0a;
+  --apple-yellow: #ffd60a;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
@@ -20,6 +34,83 @@ body {
   background: var(--apple-bg);
   color: var(--apple-text);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * { box-sizing: border-box; }
+
+/* 暗色下：把所有 bg-white 自动映射到卡片色，避免逐处改 className */
+:root[data-theme="dark"] .bg-white {
+  background-color: var(--apple-card) !important;
+}
+:root[data-theme="dark"] .bg-white\/80 {
+  background-color: color-mix(in srgb, var(--apple-card) 80%, transparent) !important;
+}
+:root[data-theme="dark"] .bg-white\/60 {
+  background-color: color-mix(in srgb, var(--apple-card) 60%, transparent) !important;
+}
+:root[data-theme="dark"] .bg-white\/90 {
+  background-color: color-mix(in srgb, var(--apple-card) 90%, transparent) !important;
+}
+
+/* 暗色下：表单控件统一为卡片色 + 文本色，避免黑底白条违和 */
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select {
+  background-color: var(--apple-card);
+  color: var(--apple-text);
+  border-color: var(--apple-border);
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: var(--apple-text-secondary);
+}
+/* 暗色下日期/时间控件指示器反色，否则在深色背景几乎不可见 */
+:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+:root[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.9);
+}
+
+/* Toast 入场动画 */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-toast-in {
+  animation: toast-in 180ms ease-out;
+}
+
+/* 打印样式：报表打印时隐藏侧边栏与悬浮按钮，强制浅色与背景图形可见 */
+@media print {
+  aside,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+  /* 打印时强制使用浅色配色，避免暗色用户打印出黑底浅字 */
+  :root,
+  :root[data-theme="dark"] {
+    --apple-bg: #ffffff;
+    --apple-card: #ffffff;
+    --apple-border: #d2d2d7;
+    --apple-text: #1d1d1f;
+    --apple-text-secondary: #555;
+  }
+  body {
+    background: white !important;
+    color: #1d1d1f !important;
+  }
+  /* 默认浏览器不打印背景色，强制保留以让图表 / 标签颜色可见 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .bg-white {
+    box-shadow: none !important;
+    border-color: #ddd !important;
+    background-color: #ffffff !important;
+  }
+}

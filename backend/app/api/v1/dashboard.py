@@ -1,14 +1,14 @@
 """Dashboard 与漏洞趋势 API。"""
 from fastapi import APIRouter, Query
 
-from app.api.deps import DatabaseDep
+from app.api.deps import CurrentUserDep, DatabaseDep
 from app.services.stats_service import StatsService
 
 router = APIRouter(tags=["Dashboard"])
 
 
 @router.get("/dashboard")
-async def get_dashboard(db: DatabaseDep):
+async def get_dashboard(db: DatabaseDep, _user: CurrentUserDep):
     stats = StatsService(db)
     summary = await stats.get_dashboard_summary()
     by_severity = await stats.get_vuln_by_severity()
@@ -23,6 +23,6 @@ async def get_dashboard(db: DatabaseDep):
 
 
 @router.get("/vulns/trend")
-async def get_vuln_trend(db: DatabaseDep, days: int = Query(30)):
+async def get_vuln_trend(db: DatabaseDep, _user: CurrentUserDep, days: int = Query(30)):
     stats = StatsService(db)
     return {"data": await stats.get_vuln_trend(days)}

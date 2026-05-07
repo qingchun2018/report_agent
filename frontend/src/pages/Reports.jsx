@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { apiJson } from '../api/client';
+import { useToast } from '../components/Toast';
+import PageSkeleton from '../components/Skeleton';
 
 const SEV_COLORS = { critical: '#ff3b30', high: '#ff9500', medium: '#ffcc00', low: '#34c759' };
 const STATUS_COLORS = { open: '#ff3b30', in_progress: '#ff9500', fixed: '#34c759', wont_fix: '#86868b' };
@@ -16,18 +19,17 @@ export default function Reports() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const toast = useToast();
 
   const generate = async (p) => {
     setPeriod(p);
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/report/${p}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await apiJson(`/api/report/${p}`, { silent: true });
       setReport(data);
     } catch (e) {
-      setError('加载失败，请确认后端已启动');
+      setError(e.message || '加载失败，请确认后端可用性');
       console.error(e);
     } finally {
       setLoading(false);
@@ -38,20 +40,39 @@ export default function Reports() {
 
   const periodLabel = period === 'daily' ? '日报' : period === 'weekly' ? '周报' : '月报';
 
+  const handlePrint = () => {
+    if (!report) {
+      toast.warning('报表尚未加载完成');
+      return;
+    }
+    window.print();
+  };
+
   return (
     <div className="max-w-7xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap no-print">
         <h2 className="text-2xl font-bold">安全报表</h2>
-        <div className="flex gap-1 bg-white rounded-xl p-1 border border-[var(--apple-border)]">
-          {['daily', 'weekly', 'monthly'].map(p => (
-            <button key={p} onClick={() => generate(p)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                period === p ? 'bg-[var(--apple-blue)] text-white' : 'hover:bg-black/5'
-              }`}>
-              {p === 'daily' ? '日报' : p === 'weekly' ? '周报' : '月报'}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 bg-white rounded-xl p-1 border border-[var(--apple-border)]">
+            {['daily', 'weekly', 'monthly'].map(p => (
+              <button key={p} onClick={() => generate(p)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  period === p ? 'bg-[var(--apple-blue)] text-white' : 'hover:bg-black/5'
+                }`}>
+                {p === 'daily' ? '日报' : p === 'weekly' ? '周报' : '月报'}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={!report || loading}
+            className="px-4 py-1.5 text-sm font-medium bg-white border border-[var(--apple-border)] rounded-lg hover:bg-black/5 disabled:opacity-50 transition-colors"
+            title="打开浏览器打印窗口；可在打印对话框中保存为 PDF"
+          >
+            打印 / 导出 PDF
+          </button>
         </div>
       </div>
 
@@ -61,11 +82,7 @@ export default function Reports() {
         </div>
       )}
 
-      {loading && (
-        <div className="flex items-center justify-center h-64 text-[var(--apple-text-secondary)]">
-          <p className="text-sm">生成{periodLabel}中...</p>
-        </div>
-      )}
+      {loading && <PageSkeleton />}
 
       {report && !loading && (
         <div className="space-y-6">
@@ -105,17 +122,14 @@ export default function Reports() {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
-              { label: '漏洞总量', value: report.summary.total_vulns, icon: '🛡️' },
-              { label: '待处理', value: report.summary.open_vulns, color: 'text-[var(--apple-red)]', icon: '⚠️' },
-              { label: '严重漏洞', value: report.summary.critical_vulns, color: 'text-[var(--apple-red)]', icon: '🔴' },
-              { label: '本周新增', value: report.summary.new_this_week, color: 'text-[var(--apple-blue)]', icon: '📈' },
-              { label: '本月新增', value: report.summary.new_this_month, color: 'text-[var(--apple-blue)]', icon: '📊' },
+              { label: '漏洞总量', value: report.summary.total_vulns },
+              { label: '待处理', value: report.summary.open_vulns, color: 'text-[var(--apple-red)]' },
+              { label: '严重漏洞', value: report.summary.critical_vulns, color: 'text-[var(--apple-red)]' },
+              { label: '本周新增', value: report.summary.new_this_week, color: 'text-[var(--apple-blue)]' },
+              { label: '本月新增', value: report.summary.new_this_month, color: 'text-[var(--apple-blue)]' },
             ].map((card, i) => (
               <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-[var(--apple-border)]">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-[var(--apple-text-secondary)] uppercase tracking-wide">{card.label}</p>
-                  <span className="text-lg">{card.icon}</span>
-                </div>
+                <p className="text-xs text-[var(--apple-text-secondary)] uppercase tracking-wide">{card.label}</p>
                 <p className={`text-3xl font-bold mt-2 ${card.color || ''}`}>{card.value}</p>
               </div>
             ))}

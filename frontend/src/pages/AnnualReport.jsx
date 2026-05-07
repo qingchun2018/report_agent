@@ -3,6 +3,7 @@ import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+import { apiJson } from '../api/client';
 
 const CATEGORY_MAP = {
   all: '全部',
@@ -35,13 +36,12 @@ export default function AnnualReport() {
 
   const loadYears = async () => {
     try {
-      const res = await fetch('/api/annual/years');
-      const data = await res.json();
+      const data = await apiJson('/api/annual/years', { silent: true });
       const yrs = data.data || [];
       setYears(yrs);
       if (yrs.length > 0) setSelectedYear(yrs[0]);
     } catch (e) {
-      setError('加载年份列表失败');
+      setError(e.message || '加载年份列表失败');
     }
   };
 
@@ -51,14 +51,17 @@ export default function AnnualReport() {
     try {
       const params = new URLSearchParams({ year });
       if (cat) params.set('category', cat);
-      const res = await fetch(`/api/annual/comparison?${params}`);
-      const data = await res.json();
+      const data = await apiJson(`/api/annual/comparison?${params}`, { silent: true });
       setComparison(data);
-      if (data.metrics?.length > 0 && !selectedMetric) {
-        setSelectedMetric(data.metrics[0].metric_key);
+      // 切换年份/类别后，若当前指标在新数据集里不存在则智能选第一个
+      const metrics = data.metrics || [];
+      if (metrics.length === 0) {
+        setSelectedMetric(null);
+      } else if (!metrics.some(m => m.metric_key === selectedMetric)) {
+        setSelectedMetric(metrics[0].metric_key);
       }
     } catch (e) {
-      setError('加载年报数据失败');
+      setError(e.message || '加载年报数据失败');
     } finally {
       setLoading(false);
     }

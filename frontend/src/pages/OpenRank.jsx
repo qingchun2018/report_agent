@@ -1,18 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+import { apiJson } from '../api/client';
+import PageSkeleton from '../components/Skeleton';
 
-const COLORS = ['#0071e3', '#5856d6', '#ff9500', '#34c759', '#ff3b30', '#ffcc00', '#af52de', '#007aff'];
-
-function MetricCard({ label, value, sub, icon }) {
+function MetricCard({ label, value, sub }) {
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-[var(--apple-border)]">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-[var(--apple-text-secondary)] uppercase tracking-wide">{label}</p>
-        <span className="text-lg">{icon}</span>
-      </div>
+      <p className="text-xs text-[var(--apple-text-secondary)] uppercase tracking-wide">{label}</p>
       <p className="text-2xl font-bold mt-1">{value}</p>
       {sub && <p className="text-xs text-[var(--apple-text-secondary)] mt-0.5">{sub}</p>}
     </div>
@@ -24,24 +21,43 @@ export default function OpenRank() {
   const [loading, setLoading] = useState(true);
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [trendData, setTrendData] = useState([]);
+  const trendSectionRef = useRef(null);
+  const pendingTrendScrollRef = useRef(false);
 
   useEffect(() => {
-    fetch('/api/openrank/overview').then(r => {
-      if (!r.ok) throw new Error();
-      return r.json();
-    }).then(d => {
+    apiJson('/api/openrank/overview', { silent: true }).then(d => {
       setData(d);
       setLoading(false);
-      if (d.ranking?.length > 0) loadTrend(d.ranking[0].repo);
+      if (d.ranking?.length > 0) loadTrend(d.ranking[0].repo, false);
     }).catch(() => setLoading(false));
   }, []);
 
-  const loadTrend = (repo) => {
+  const loadTrend = (repo, scrollToChartAfterLoad = false) => {
+    pendingTrendScrollRef.current = scrollToChartAfterLoad;
     setSelectedRepo(repo);
-    fetch(`/api/openrank/trend/${repo}`).then(r => r.json()).then(d => setTrendData(d.data || []));
+    apiJson(`/api/openrank/trend/${encodeURIComponent(repo)}`, { silent: true })
+      .then(d => setTrendData(d.data || []))
+      .catch(() => setTrendData([]));
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-[var(--apple-text-secondary)]">Loading...</div>;
+  // 用户点击「查看」后，等趋势图渲染完成再滚到图表区域
+  // 注意：StrictMode 下 effect 会跑两次，cleanup 里若 cancelAnimationFrame 会把首次调度的滚动帧取消，
+  // 导致永远不滚动；因此这里改用 setTimeout 且不在 cleanup 中取消（一次性滚动操作即便组件卸载也无副作用）。
+  useEffect(() => {
+    if (!pendingTrendScrollRef.current) return;
+    if (!selectedRepo) return;
+    if (trendData.length === 0) {
+      pendingTrendScrollRef.current = false;
+      return;
+    }
+    pendingTrendScrollRef.current = false;
+    // 留一点时间让 ResponsiveContainer 完成宽高测量，再滚动到目标位置
+    setTimeout(() => {
+      trendSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }, [selectedRepo, trendData]);
+
+  if (loading) return <PageSkeleton />;
   if (!data) return <div className="text-center py-12 text-[var(--apple-text-secondary)]">无法加载 OpenRank 数据</div>;
 
   const { ranking = [], top_active = [], health_scores = [], growth_leaders = [] } = data;
@@ -59,11 +75,11 @@ export default function OpenRank() {
       {/* Summary Cards */}
       {top1 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <MetricCard label="Top 1 项目" value={top1.repo} sub={`OpenRank: ${top1.openrank}`} icon="👑" />
-          <MetricCard label="最高 Activity" value={top_active[0]?.activity || '-'} sub={top_active[0]?.repo} icon="🔥" />
-          <MetricCard label="最佳健康度" value={`${health_scores[0]?.health}%`} sub={health_scores[0]?.repo} icon="💚" />
-          <MetricCard label="增长最快" value={`+${growth_leaders[0]?.growth_pct}%`} sub={growth_leaders[0]?.repo} icon="🚀" />
-          <MetricCard label="项目总数" value={ranking.length} sub="参与排名" icon="📊" />
+          <MetricCard label="Top 1 项目" value={top1.repo} sub={`OpenRank: ${top1.openrank}`} />
+          <MetricCard label="最高 Activity" value={top_active[0]?.activity || '-'} sub={top_active[0]?.repo} />
+          <MetricCard label="最佳健康度" value={`${health_scores[0]?.health ?? '-'}%`} sub={health_scores[0]?.repo} />
+          <MetricCard label="增长最快" value={growth_leaders[0] ? `+${growth_leaders[0].growth_pct}%` : '-'} sub={growth_leaders[0]?.repo} />
+          <MetricCard label="项目总数" value={ranking.length} sub="参与排名" />
         </div>
       )}
 
@@ -106,7 +122,7 @@ export default function OpenRank() {
                   <td className="py-2.5 px-3 text-right tabular-nums">{r.pr_merged}</td>
                   <td className="py-2.5 px-3 text-right tabular-nums">{r.attention?.toLocaleString()}</td>
                   <td className="py-2.5 px-3 text-center">
-                    <button onClick={() => loadTrend(r.repo)}
+                    <button type="button" onClick={() => loadTrend(r.repo, true)}
                       className="px-2 py-0.5 text-xs bg-[var(--apple-blue)]/10 text-[var(--apple-blue)] rounded-full hover:bg-[var(--apple-blue)]/20 transition-colors">
                       查看
                     </button>
@@ -120,7 +136,7 @@ export default function OpenRank() {
 
       {/* Trend Chart for Selected Repo */}
       {selectedRepo && trendData.length > 0 && (
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-[var(--apple-border)]">
+        <div ref={trendSectionRef} className="bg-white rounded-2xl p-5 shadow-sm border border-[var(--apple-border)] scroll-mt-24">
           <h3 className="text-sm font-semibold mb-4">{selectedRepo} — OpenRank 趋势（12 个月）</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={trendData}>

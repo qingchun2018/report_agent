@@ -3,6 +3,8 @@ import {
   LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { apiJson } from '../api/client';
+import { useToast } from '../components/Toast';
 
 const LAYER_COLORS = {
   'ODS→DWD': '#0071e3',
@@ -39,6 +41,7 @@ export default function HiveCompare() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [layerFilter, setLayerFilter] = useState('all');
+  const toast = useToast();
 
   useEffect(() => {
     loadTablePairs();
@@ -46,11 +49,10 @@ export default function HiveCompare() {
 
   const loadTablePairs = async () => {
     try {
-      const res = await fetch('/api/hive/table-pairs');
-      const data = await res.json();
+      const data = await apiJson('/api/hive/table-pairs', { silent: true });
       setTablePairs(data.data || []);
     } catch (e) {
-      setError('加载 Hive 表对信息失败');
+      setError(e.message || '加载 Hive 表对信息失败');
     }
   };
 
@@ -67,29 +69,36 @@ export default function HiveCompare() {
       if (date) params.set('compare_date', date);
       params.set('limit', '50');
 
-      const res = await fetch(`/api/hive/diffs?${params}`);
-      const data = await res.json();
+      const data = await apiJson(`/api/hive/diffs?${params}`, { silent: true });
       setDiffs(data.data || []);
 
       if (pair) {
-        const trendRes = await fetch(
-          `/api/hive/diff-trend?source_table=${pair.source_table}&target_table=${pair.target_table}&days=30`
+        const trendData = await apiJson(
+          `/api/hive/diff-trend?source_table=${pair.source_table}&target_table=${pair.target_table}&days=30`,
+          { silent: true }
         );
-        const trendData = await trendRes.json();
         setTrend(trendData.data || []);
       }
     } catch (e) {
-      setError('查询 Hive 差异数据失败');
+      setError(e.message || '查询 Hive 差异数据失败');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleQueryClick = () => {
+    if (!selectedPair) {
+      toast.warning('请先在下方选择一组 Hive 表对');
+      return;
+    }
+    loadDiffs(selectedPair, compareDate);
+  };
+
+  const handleClearDate = () => setCompareDate('');
+
   const filteredPairs = layerFilter === 'all'
     ? tablePairs
     : tablePairs.filter(p => `${p.source_layer}→${p.target_layer}` === layerFilter);
-
-  const layerGroups = [...new Set(tablePairs.map(p => `${p.source_layer}→${p.target_layer}`))];
 
   const diffSummary = diffs.reduce((acc, d) => {
     acc.total++;
@@ -112,7 +121,7 @@ export default function HiveCompare() {
             数仓分层校验 · ODS → DWD → DWS → ADS 各层 Hive 表数据一致性
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <input
             type="date"
             value={compareDate}
@@ -120,11 +129,23 @@ export default function HiveCompare() {
             className="px-3 py-1.5 text-sm border border-[var(--apple-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--apple-blue)]/30"
             placeholder="选择分区日期 (dt)"
           />
+          {compareDate && (
+            <button
+              type="button"
+              onClick={handleClearDate}
+              className="px-2 py-1.5 text-xs text-[var(--apple-text-secondary)] hover:text-[var(--apple-text)] border border-[var(--apple-border)] rounded-lg bg-white hover:bg-black/5"
+              title="清除日期"
+            >
+              清除
+            </button>
+          )}
           <button
-            onClick={() => loadDiffs(selectedPair, compareDate)}
-            className="px-4 py-1.5 text-sm font-medium bg-[var(--apple-blue)] text-white rounded-lg hover:opacity-90 transition-opacity"
+            onClick={handleQueryClick}
+            disabled={!selectedPair || loading}
+            className="px-4 py-1.5 text-sm font-medium bg-[var(--apple-blue)] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+            title={!selectedPair ? '请先选择 Hive 表对' : '查询差异'}
           >
-            查询
+            {loading ? '查询中...' : '查询'}
           </button>
         </div>
       </div>

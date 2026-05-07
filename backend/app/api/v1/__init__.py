@@ -1,9 +1,22 @@
 """API v1 路由聚合。"""
 from fastapi import APIRouter
 
-from app.api.v1 import agent, annual, dashboard, github, hive, openrank, raw_data, reports
+from app.api.v1 import (
+    agent,
+    annual,
+    auth,
+    dashboard,
+    github,
+    health,
+    hive,
+    openrank,
+    raw_data,
+    reports,
+)
 
 api_router = APIRouter()
+api_router.include_router(health.router)
+api_router.include_router(auth.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(github.router)
 api_router.include_router(openrank.router)

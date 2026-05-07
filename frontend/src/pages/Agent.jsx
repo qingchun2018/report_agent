@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { apiFetch } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 
 const CHART_COLORS = ['#0071e3', '#5856d6', '#ff9500', '#34c759', '#ff3b30', '#ffcc00', '#af52de', '#007aff'];
 
@@ -150,24 +152,73 @@ function ChartRenderer({ type, data, title }) {
   );
 }
 
+// 按用户区分会话，避免共用机器时窜聊天
+function buildStorageKey(userId) {
+  return `agent_history:${userId || 'anon'}`;
+}
+const MAX_PERSIST_MESSAGES = 100;
+
 export default function Agent() {
+  const { user } = useAuth();
+  const storageKey = buildStorageKey(user?.id);
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
   const sessionIdRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // 切换用户时从 localStorage 恢复历史
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const obj = JSON.parse(raw);
+        if (Array.isArray(obj.messages)) setMessages(obj.messages);
+        if (obj.session_id) sessionIdRef.current = obj.session_id;
+      } else {
+        setMessages([]);
+        sessionIdRef.current = null;
+      }
+    } catch {
+      // 忽略解析失败
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  // 写回 localStorage（截断，避免无限膨胀）
+  useEffect(() => {
+    try {
+      const trimmed = messages.slice(-MAX_PERSIST_MESSAGES);
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ messages: trimmed, session_id: sessionIdRef.current })
+      );
+    } catch {
+      // 忽略 localStorage 写入失败（如配额超限）
+    }
+  }, [messages, storageKey]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const clearConversation = () => {
+  const clearConversation = useCallback(() => {
     setMessages([]);
     sessionIdRef.current = null;
+    try { localStorage.removeItem(storageKey); } catch { /* 忽略 */ }
+  }, [storageKey]);
+
+  const adjustTextareaHeight = (el) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   };
 
   const send = async (text) => {
-    const q = text || input.trim();
+    const q = (text ?? input).trim();
     if (!q || loading) return;
     setInput('');
+    requestAnimationFrame(() => adjustTextareaHeight(inputRef.current));
     if (!sessionIdRef.current) {
       sessionIdRef.current = typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
@@ -177,18 +228,18 @@ export default function Agent() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/agent/chat', {
+      const res = await apiFetch('/api/agent/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, session_id: sessionIdRef.current }),
+        silent: true,
       });
       if (!res.ok) {
         let errMsg = `服务器错误 (${res.status})`;
         try {
           const errData = await res.json();
           errMsg = errData.detail || errData.error || errMsg;
-        } catch {}
-        if (res.status === 401 || errMsg.includes('Authentication') || errMsg.includes('api key')) {
+        } catch { /* 解析失败 */ }
+        if (errMsg && (errMsg.includes('Authentication') || errMsg.includes('api key'))) {
           errMsg = 'DeepSeek API Key 无效，请在 backend/.env 中配置正确的 DEEPSEEK_API_KEY';
         }
         throw new Error(errMsg);
@@ -201,6 +252,14 @@ export default function Agent() {
       setMessages(prev => [...prev, { role: 'assistant', error: e.message }]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    // Enter 发送，Shift+Enter 换行
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) {
+      e.preventDefault();
+      send();
     }
   };
 
@@ -320,23 +379,31 @@ export default function Agent() {
 
       {/* Input */}
       <div className="border-t border-[var(--apple-border)] pt-4">
-        <div className="flex gap-2">
-          <input
+        <div className="flex gap-2 items-end">
+          <textarea
+            ref={inputRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && send()}
-            placeholder="输入你的问题..."
-            className="flex-1 px-4 py-3 bg-white border border-[var(--apple-border)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--apple-blue)]/30 focus:border-[var(--apple-blue)]"
+            onChange={e => {
+              setInput(e.target.value);
+              adjustTextareaHeight(e.target);
+            }}
+            onKeyDown={handleKeyDown}
+            rows={1}
+            placeholder="输入你的问题（Enter 发送，Shift+Enter 换行）"
+            className="flex-1 px-4 py-3 bg-white border border-[var(--apple-border)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--apple-blue)]/30 focus:border-[var(--apple-blue)] resize-none leading-6 max-h-40"
             disabled={loading}
           />
           <button
             onClick={() => send()}
             disabled={loading || !input.trim()}
-            className="px-5 py-3 bg-[var(--apple-blue)] text-white text-sm font-medium rounded-xl hover:bg-[#0077ed] disabled:opacity-40 transition-colors"
+            className="px-5 py-3 bg-[var(--apple-blue)] text-white text-sm font-medium rounded-xl hover:bg-[#0077ed] disabled:opacity-40 transition-colors shrink-0"
           >
             发送
           </button>
         </div>
+        <p className="text-[10px] text-[var(--apple-text-secondary)] mt-1.5 ml-1">
+          会话已按用户保存在本地，刷新不会丢失；最多保留最近 {MAX_PERSIST_MESSAGES} 条。
+        </p>
       </div>
     </div>
   );

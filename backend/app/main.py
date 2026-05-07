@@ -13,6 +13,7 @@ _backend_root = Path(__file__).resolve().parent.parent
 load_dotenv(_backend_root / ".env")
 
 from app.api.v1 import api_router
+from app.services.auth_service import AuthService
 from app.utils.database import close_db, connect_db, get_db
 from app.utils.seed_data import seed_database
 
@@ -20,8 +21,26 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+_DEFAULT_JWT_SECRET = "please_change_me_to_a_long_random_string"
+
+
+def _check_jwt_secret() -> None:
+    """启动时校验 JWT_SECRET_KEY；用默认值或过短时打告警，便于运维及时修正。"""
+    secret = os.getenv("JWT_SECRET_KEY", _DEFAULT_JWT_SECRET)
+    if secret == _DEFAULT_JWT_SECRET:
+        logger.warning(
+            "[SECURITY] JWT_SECRET_KEY 仍是默认值，生产环境请务必改为长随机串。"
+            " 例如：python -c \"import secrets;print(secrets.token_urlsafe(48))\""
+        )
+    elif len(secret) < 32:
+        logger.warning(
+            "[SECURITY] JWT_SECRET_KEY 长度不足 32，建议使用至少 48 字节随机串。"
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _check_jwt_secret()
     await connect_db()
     db = get_db()
     seeded = await seed_database(db)
@@ -29,6 +48,11 @@ async def lifespan(app: FastAPI):
         logger.info("Database seeded with mock data")
     else:
         logger.info("Database already contains data, skipping seed")
+    # 启动时确保用户表索引就绪，避免首个并发注册时争抢
+    try:
+        await AuthService(db).ensure_indexes()
+    except Exception as exc:
+        logger.warning("ensure user indexes failed: %s", exc)
     yield
     await close_db()
 
