@@ -375,7 +375,7 @@ class StatsService:
     # ─── GitHub 年度总览 KPI ───
 
     async def get_github_annual_kpi(self) -> Dict[str, Any]:
-        """返回各年度 Star 总增量对比，用于 KPI 卡片"""
+        """返回各年度 Star 总增量对比，用于 KPI 卡片（排除无数据年份）"""
         from datetime import datetime
         years_data = {}
         for year in range(2021, 2027):
@@ -387,7 +387,8 @@ class StatsService:
                     {"$group": {"_id": None, "total": {"$sum": "$stars_today"}, "repos": {"$sum": 1}}},
                 ]
                 r = await self.db.github_trends.aggregate(pipeline).to_list(1)
-                years_data[year] = {"total": r[0]["total"], "repos": r[0]["repos"]} if r else {"total": 0, "repos": 0}
+                if r and r[0]["total"] > 0:
+                    years_data[year] = {"total": r[0]["total"], "repos": r[0]["repos"]}
             except Exception:
                 docs = await self.db.github_trends.find(
                     {"snapshot_date": {"$gte": start, "$lt": end}}
@@ -396,7 +397,9 @@ class StatsService:
                 g = defaultdict(int)
                 for d in docs:
                     g[d.get("repo_name", "")] += d.get("stars_today", 0)
-                years_data[year] = {"total": sum(g.values()), "repos": len(g)}
+                total = sum(g.values())
+                if total > 0:
+                    years_data[year] = {"total": total, "repos": len(g)}
         return {"years": years_data}
 
     # ─── GitHub 年度排名 ───

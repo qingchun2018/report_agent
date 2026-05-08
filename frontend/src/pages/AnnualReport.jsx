@@ -129,12 +129,11 @@ export default function AnnualReport() {
         </div>
       </div>
 
-      {/* GitHub KPI 总览卡片 */}
-      {kpi && (() => {
-        const yearKeys = Object.keys(kpi).sort((a,b) => Number(a)-Number(b));
-        const latest = yearKeys[yearKeys.length - 1];
-        const prev = String(Number(latest) - 1);
-        const currVal = kpi[latest]?.total || 0;
+      {/* GitHub KPI 总览卡片 — 跟随选中年份 */}
+      {kpi && selectedYear && kpi[String(selectedYear)] && (() => {
+        const yr = String(selectedYear);
+        const prev = String(selectedYear - 1);
+        const currVal = kpi[yr]?.total || 0;
         const prevVal = kpi[prev]?.total || 0;
         const diff = currVal - prevVal;
         const pct = prevVal > 0 ? ((diff / prevVal) * 100).toFixed(1) : '0';
@@ -144,9 +143,10 @@ export default function AnnualReport() {
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#238636] via-[#2ea043] to-[#56d364]" />
             <div className="flex items-center gap-2.5 mb-4">
               <svg className="w-5 h-5 fill-[#8b949e]" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-              <span className="text-sm font-medium text-[#8b949e] uppercase tracking-wider">{latest} GitHub Total Star Growth</span>
+              <span className="text-sm font-medium text-[#8b949e] uppercase tracking-wider">{yr} GitHub Total Star Growth</span>
             </div>
             <p className="text-6xl font-extrabold text-[#f0f6fc] tracking-tighter tabular-nums">{fmtKpi(currVal)}</p>
+            <p className="text-xs text-[#484f58] mt-1">{kpi[yr]?.repos || 0} repositories</p>
             <div className="h-px bg-gradient-to-r from-[#30363d] to-transparent my-5" />
             <div className="flex items-center gap-3 mb-2">
               <span className="text-sm text-[#8b949e]">较 {prev} 年</span>
@@ -157,7 +157,7 @@ export default function AnnualReport() {
             <p className={`text-2xl font-extrabold mb-5 ${isUp ? 'text-[#3fb950]' : 'text-[#f85149]'}`}>
               ({isUp ? '+' : ''}{pct}%)
             </p>
-            <p className="text-xs text-[#484f58]">{prev} 年：{fmtKpi(prevVal)}</p>
+            <p className="text-xs text-[#484f58]">{prev} 年基准：{fmtKpi(prevVal)}</p>
             <div className="absolute bottom-0 left-0 right-0 h-6 opacity-25" style={{
               background: 'repeating-linear-gradient(90deg, #238636 0px, #238636 2px, transparent 2px, transparent 14px)'
             }} />
