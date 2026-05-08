@@ -372,6 +372,163 @@ class StatsService:
         docs.reverse()
         return docs
 
+    # ─── GitHub 年度排名 ───
+
+    async def get_github_annual_years(self) -> List[int]:
+        """从 github_trends 中提取有数据的年份"""
+        try:
+            pipeline = [
+                {"$group": {"_id": {"$year": "$snapshot_date"}}},
+                {"$sort": {"_id": -1}},
+            ]
+            results = await self.db.github_trends.aggregate(pipeline).to_list(None)
+            return [r["_id"] for r in results]
+        except Exception:
+            docs = await self.db.github_trends.find({}).to_list(None)
+            years = set()
+            for d in docs:
+                if d.get("snapshot_date"):
+                    years.add(d["snapshot_date"].year)
+            return sorted(years, reverse=True)
+
+    async def get_github_annual_ranking(
+        self, year: int, top_n: int = 10
+    ) -> Dict[str, Any]:
+        """获取指定年份 GitHub 项目年度排名（按年增星数排序）"""
+        from datetime import datetime
+        start = datetime(year, 1, 1)
+        end = datetime(year + 1, 1, 1)
+
+        try:
+            pipeline = [
+                {"$match": {"snapshot_date": {"$gte": start, "$lt": end}}},
+                {"$group": {
+                    "_id": "$repo_name",
+                    "owner": {"$first": "$owner"},
+                    "description": {"$first": "$description"},
+                    "language": {"$first": "$language"},
+                    "latest_stars": {"$last": "$stars"},
+                    "latest_forks": {"$last": "$forks"},
+                    "total_stars_gained": {"$sum": "$stars_today"},
+                    "snapshot_count": {"$sum": 1},
+                    "peak_daily_stars": {"$max": "$stars_today"},
+                }},
+                {"$sort": {"total_stars_gained": -1}},
+                {"$limit": top_n},
+            ]
+            results = await self.db.github_trends.aggregate(pipeline).to_list(None)
+            ranking = []
+            for i, r in enumerate(results):
+                sn = r.get("snapshot_count", 1)
+                ranking.append({
+                    "rank": i + 1,
+                    "repo": r["_id"],
+                    "owner": r.get("owner", ""),
+                    "description": r.get("description", ""),
+                    "language": r.get("language", ""),
+                    "stars": r.get("latest_stars", 0),
+                    "stars_gained": r.get("total_stars_gained", 0),
+                    "avg_daily": round(r.get("total_stars_gained", 0) / sn, 1),
+                    "peak_daily": r.get("peak_daily_stars", 0),
+                    "forks": r.get("latest_forks", 0),
+                })
+        except Exception:
+            # Fallback: 手动聚合
+            docs = await self.db.github_trends.find(
+                {"snapshot_date": {"$gte": start, "$lt": end}}
+            ).to_list(None)
+            from collections import defaultdict
+            grouped = defaultdict(list)
+            for d in docs:
+                grouped[d.get("repo_name", "")].append(d)
+            results = []
+            for repo_name, entries in grouped.items():
+                entries.sort(key=lambda x: x.get("snapshot_date", datetime.min))
+                latest = entries[-1]
+                total_gained = sum(e.get("stars_today", 0) for e in entries)
+                avg_daily = total_gained / len(entries) if entries else 0
+                peak = max((e.get("stars_today", 0) for e in entries), default=0)
+                results.append({
+                    "repo": repo_name,
+                    "owner": latest.get("owner", ""),
+                    "description": latest.get("description", ""),
+                    "language": latest.get("language", ""),
+                    "stars": latest.get("stars", 0),
+                    "stars_gained": total_gained,
+                    "avg_daily": round(avg_daily, 1),
+                    "peak_daily": peak,
+                    "forks": latest.get("forks", 0),
+                })
+            results.sort(key=lambda x: x["stars_gained"], reverse=True)
+            results = results[:top_n]
+            ranking = []
+            for i, r in enumerate(results):
+                r["rank"] = i + 1
+                ranking.append(r)
+
+        # 尝试关联 OpenRank 数据
+        repo_names = [r["repo"] for r in ranking]
+        try:
+            ork_cursor = self.db.openrank_metrics.find(
+                {"repo_name": {"$in": repo_names}},
+                {"_id": 0, "repo_name": 1, "openrank": 1, "activity": 1,
+                 "bus_factor": 1, "participants": 1, "month": 1}
+            ).sort("month", -1)
+            ork_docs = await ork_cursor.to_list(None)
+            ork_map = {}
+            for od in ork_docs:
+                rn = od["repo_name"]
+                if rn not in ork_map:
+                    ork_map[rn] = od
+            for r in ranking:
+                od = ork_map.get(r["repo"])
+                if od:
+                    r["openrank"] = od.get("openrank", 0)
+                    r["activity"] = od.get("activity", 0)
+                    r["bus_factor"] = od.get("bus_factor", 0)
+                    r["participants"] = od.get("participants", 0)
+        except Exception:
+            pass
+
+        # 月度趋势汇总
+        monthly_trend = []
+        try:
+            m_pipeline = [
+                {"$match": {
+                    "snapshot_date": {"$gte": start, "$lt": end},
+                    "repo_name": {"$in": repo_names},
+                }},
+                {"$group": {
+                    "_id": {
+                        "month": {"$month": "$snapshot_date"},
+                        "repo": "$repo_name",
+                    },
+                    "monthly_gained": {"$sum": "$stars_today"},
+                }},
+                {"$sort": {"_id.month": 1}},
+            ]
+            m_results = await self.db.github_trends.aggregate(m_pipeline).to_list(None)
+            from collections import defaultdict
+            by_month = defaultdict(lambda: {"month": None, "repos": {}})
+            for mr in m_results:
+                m = mr["_id"]["month"]
+                rn = mr["_id"]["repo"]
+                by_month[m]["month"] = m
+                by_month[m]["repos"][rn] = mr["monthly_gained"]
+            monthly_trend = [
+                {"month": v["month"], **v["repos"]}
+                for v in sorted(by_month.values(), key=lambda x: x["month"])
+            ]
+        except Exception:
+            pass
+
+        return {
+            "year": year,
+            "ranking": ranking,
+            "monthly_trend": monthly_trend,
+            "repo_names": repo_names,
+        }
+
     # ─── 年报数据 ───
 
     async def get_annual_years(self) -> List[int]:
