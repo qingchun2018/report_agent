@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { apiJson } from '../api/client';
 
 const TOP_OPTIONS = [10, 50, 100];
@@ -277,7 +277,7 @@ export default function AnnualReport() {
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={trendChartData}>
+                  <LineChart data={trendChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 10 }} />
@@ -286,18 +286,20 @@ export default function AnnualReport() {
                     />
                     <Legend />
                     {selectedRepos.map((repo, i) => (
-                      <Bar
+                      <Line
                         key={repo}
+                        type="monotone"
                         dataKey={repo}
-                        fill={METRIC_COLORS[i % METRIC_COLORS.length]}
-                        stackId="stack"
-                        radius={i === selectedRepos.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                        stroke={METRIC_COLORS[i % METRIC_COLORS.length]}
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        connectNulls
                       />
                     ))}
-                  </BarChart>
+                  </LineChart>
                 </ResponsiveContainer>
                 <p className="text-[11px] text-[var(--apple-text-secondary)] mt-3">
-                  💡 点击排行榜中的项目行，或上方标签，可在趋势图中添加/移除项目。堆叠柱状图展示各项目每月贡献的 Star 增量。
+                  💡 点击排行榜中的项目行，或上方标签，可在趋势图中添加/移除项目。折线图展示各项目每月 Star 增量趋势。
                 </p>
               </div>
             </div>
