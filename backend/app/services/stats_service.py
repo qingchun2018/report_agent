@@ -517,6 +517,31 @@ class StatsService:
         except Exception:
             pass
 
+        # 年度趋势（各 repo 每年 Star 增量）
+        yearly_by_repo = {}
+        try:
+            # Get all years for each repo in the ranking
+            y_pipeline = [
+                {"$match": {"repo_name": {"$in": repo_names}}},
+                {"$group": {
+                    "_id": {
+                        "year": {"$year": "$snapshot_date"},
+                        "repo": "$repo_name",
+                    },
+                    "total": {"$sum": "$stars_today"},
+                }},
+                {"$sort": {"_id.year": 1}},
+            ]
+            y_results = await self.db.github_trends.aggregate(y_pipeline).to_list(None)
+            for yr in y_results:
+                y = yr["_id"]["year"]
+                rn = yr["_id"]["repo"]
+                if y not in yearly_by_repo:
+                    yearly_by_repo[y] = {}
+                yearly_by_repo[y][rn] = yr["total"]
+        except Exception:
+            pass
+
         # 月度趋势汇总
         monthly_trend = []
         try:
@@ -552,6 +577,7 @@ class StatsService:
         return {
             "year": year,
             "ranking": ranking,
+            "yearly_trend": yearly_by_repo,
             "monthly_trend": monthly_trend,
             "repo_names": repo_names,
         }

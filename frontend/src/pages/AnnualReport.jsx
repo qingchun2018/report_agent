@@ -23,6 +23,7 @@ export default function AnnualReport() {
   const [ranking, setRanking] = useState([]);
   const [repoNames, setRepoNames] = useState([]);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
+  const [yearlyTrend, setYearlyTrend] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedRepos, setSelectedRepos] = useState([]);
@@ -73,6 +74,7 @@ export default function AnnualReport() {
       setRanking(data.ranking || []);
       setRepoNames(data.repo_names || []);
       setMonthlyTrend(data.monthly_trend || []);
+      setYearlyTrend(data.yearly_trend || {});
 
       // 默认选中前 5 个展示趋势
       const top5 = (data.ranking || []).slice(0, 5).map(r => r.repo);
@@ -106,6 +108,15 @@ export default function AnnualReport() {
         selectedRepos.map(r => [r, d[r] || 0])
       ),
     }));
+
+  // 年度趋势：横轴为年份，每条线是一个 repo
+  const yearlyYears = Object.keys(yearlyTrend).sort((a,b) => Number(a)-Number(b));
+  const yearlyChartData = yearlyYears.map(y => ({
+    year: `${y}年`,
+    ...Object.fromEntries(
+      selectedRepos.map(r => [r, yearlyTrend[y]?.[r] || 0])
+    ),
+  }));
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -354,6 +365,35 @@ export default function AnnualReport() {
                   💡 点击排行榜中的项目行，或上方标签，可在趋势图中添加/移除项目。折线图展示各项目每月 Star 增量趋势。
                 </p>
               </div>
+
+              {/* 年度趋势折线图 */}
+              {yearlyChartData.length > 1 && selectedRepos.length > 0 && (
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-[var(--apple-border)]">
+                  <h3 className="text-sm font-semibold mb-4">年度 Star 增量趋势（按年）</h3>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <LineChart data={yearlyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip
+                        formatter={(v, name) => [typeof v === 'number' ? v.toLocaleString() : v, name]}
+                      />
+                      <Legend />
+                      {selectedRepos.map((repo, i) => (
+                        <Line
+                          key={repo}
+                          type="monotone"
+                          dataKey={repo}
+                          stroke={METRIC_COLORS[i % METRIC_COLORS.length]}
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
           )}
         </>
