@@ -13,6 +13,12 @@ async def get_annual_years(db: DatabaseDep, _user: CurrentUserDep):
     return {"data": await stats.get_github_annual_years()}
 
 
+@router.get("/annual/github/kpi")
+async def get_github_annual_kpi_api(db: DatabaseDep, _user: CurrentUserDep):
+    stats = StatsService(db)
+    return await stats.get_github_annual_kpi()
+
+
 @router.get("/annual/github/years")
 async def get_github_annual_years_api(db: DatabaseDep, _user: CurrentUserDep):
     stats = StatsService(db)

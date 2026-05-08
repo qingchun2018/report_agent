@@ -372,6 +372,33 @@ class StatsService:
         docs.reverse()
         return docs
 
+    # ─── GitHub 年度总览 KPI ───
+
+    async def get_github_annual_kpi(self) -> Dict[str, Any]:
+        """返回各年度 Star 总增量对比，用于 KPI 卡片"""
+        from datetime import datetime
+        years_data = {}
+        for year in range(2021, 2027):
+            start = datetime(year, 1, 1)
+            end = datetime(year + 1, 1, 1) if year < 2026 else datetime(2026, 5, 9)
+            try:
+                pipeline = [
+                    {"$match": {"snapshot_date": {"$gte": start, "$lt": end}}},
+                    {"$group": {"_id": None, "total": {"$sum": "$stars_today"}, "repos": {"$sum": 1}}},
+                ]
+                r = await self.db.github_trends.aggregate(pipeline).to_list(1)
+                years_data[year] = {"total": r[0]["total"], "repos": r[0]["repos"]} if r else {"total": 0, "repos": 0}
+            except Exception:
+                docs = await self.db.github_trends.find(
+                    {"snapshot_date": {"$gte": start, "$lt": end}}
+                ).to_list(None)
+                from collections import defaultdict
+                g = defaultdict(int)
+                for d in docs:
+                    g[d.get("repo_name", "")] += d.get("stars_today", 0)
+                years_data[year] = {"total": sum(g.values()), "repos": len(g)}
+        return {"years": years_data}
+
     # ─── GitHub 年度排名 ───
 
     async def get_github_annual_years(self) -> List[int]:
