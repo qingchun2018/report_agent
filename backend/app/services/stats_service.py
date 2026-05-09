@@ -246,7 +246,9 @@ class StatsService:
         # 健康度评分（综合 bus_factor、issue 关闭率、PR 合并数）
         health_scores = []
         for d in latest:
-            issue_rate = d["issues_closed"] / max(d["issues_new"], 1)
+            closed_n = d.get("issues_closed") or 0
+            new_n = d.get("issues_new") or 0
+            issue_rate = closed_n / max(new_n, 1)
             bf_score = min(d["bus_factor"] / 10, 1.0)
             pr_score = min(d.get("pr_merged", 0) / 50, 1.0)
             health = round((issue_rate * 0.3 + bf_score * 0.4 + pr_score * 0.3) * 100, 1)
@@ -378,9 +380,15 @@ class StatsService:
         """返回各年度 Star 总增量对比，用于 KPI 卡片（排除无数据年份）"""
         from datetime import datetime
         years_data = {}
+        now = datetime.now()
         for year in range(2021, 2027):
             start = datetime(year, 1, 1)
-            end = datetime(year + 1, 1, 1) if year < 2026 else datetime(2026, 5, 9)
+            if start > now:
+                continue
+            # 当前自然年只统计到「当前时间」，避免写死日期导致 KPI 与真实数据不符
+            end = min(datetime(year + 1, 1, 1), now)
+            if start >= end:
+                continue
             try:
                 pipeline = [
                     {"$match": {"snapshot_date": {"$gte": start, "$lt": end}}},

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  BarChart, Bar, LineChart, Line,
+  BarChart, Bar, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { apiJson } from '../api/client';
@@ -24,21 +24,21 @@ export default function OpenRank() {
   const trendSectionRef = useRef(null);
   const pendingTrendScrollRef = useRef(false);
 
+  const loadTrend = useCallback((repo, scrollToChartAfterLoad = false) => {
+    pendingTrendScrollRef.current = scrollToChartAfterLoad;
+    setSelectedRepo(repo);
+    apiJson(`/api/openrank/trend/${encodeURIComponent(repo)}`, { silent: true })
+      .then(d => setTrendData(d.data || []))
+      .catch(() => setTrendData([]));
+  }, []);
+
   useEffect(() => {
     apiJson('/api/openrank/overview', { silent: true }).then(d => {
       setData(d);
       setLoading(false);
       if (d.ranking?.length > 0) loadTrend(d.ranking[0].repo, false);
     }).catch(() => setLoading(false));
-  }, []);
-
-  const loadTrend = (repo, scrollToChartAfterLoad = false) => {
-    pendingTrendScrollRef.current = scrollToChartAfterLoad;
-    setSelectedRepo(repo);
-    apiJson(`/api/openrank/trend/${encodeURIComponent(repo)}`, { silent: true })
-      .then(d => setTrendData(d.data || []))
-      .catch(() => setTrendData([]));
-  };
+  }, [loadTrend]);
 
   // 用户点击「查看」后，等趋势图渲染完成再滚到图表区域
   // 注意：StrictMode 下 effect 会跑两次，cleanup 里若 cancelAnimationFrame 会把首次调度的滚动帧取消，
@@ -76,7 +76,7 @@ export default function OpenRank() {
       {top1 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <MetricCard label="Top 1 项目" value={top1.repo} sub={`OpenRank: ${top1.openrank}`} />
-          <MetricCard label="最高 Activity" value={top_active[0]?.activity || '-'} sub={top_active[0]?.repo} />
+          <MetricCard label="最高 Activity" value={top_active[0]?.activity ?? '-'} sub={top_active[0]?.repo} />
           <MetricCard label="最佳健康度" value={`${health_scores[0]?.health ?? '-'}%`} sub={health_scores[0]?.repo} />
           <MetricCard label="增长最快" value={growth_leaders[0] ? `+${growth_leaders[0].growth_pct}%` : '-'} sub={growth_leaders[0]?.repo} />
           <MetricCard label="项目总数" value={ranking.length} sub="参与排名" />
@@ -189,7 +189,7 @@ export default function OpenRank() {
               <Bar dataKey="health" radius={[0, 6, 6, 0]}>
                 {health_scores.slice(0, 10).map((entry, i) => {
                   const color = entry.health >= 70 ? '#34c759' : entry.health >= 40 ? '#ff9500' : '#ff3b30';
-                  return <rect key={i} fill={color} />;
+                  return <Cell key={`health-${entry.repo}-${i}`} fill={color} />;
                 })}
               </Bar>
             </BarChart>

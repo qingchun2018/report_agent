@@ -73,8 +73,10 @@ export default function HiveCompare() {
       setDiffs(data.data || []);
 
       if (pair) {
+        const src = encodeURIComponent(pair.source_table);
+        const tgt = encodeURIComponent(pair.target_table);
         const trendData = await apiJson(
-          `/api/hive/diff-trend?source_table=${pair.source_table}&target_table=${pair.target_table}&days=30`,
+          `/api/hive/diff-trend?source_table=${src}&target_table=${tgt}&days=30`,
           { silent: true }
         );
         setTrend(trendData.data || []);
