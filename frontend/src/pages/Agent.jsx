@@ -3,6 +3,8 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { apiFetch } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -76,78 +78,108 @@ const SUGGESTION_GROUPS = [
 function ChartRenderer({ type, data, title }) {
   if (!data || data.length === 0) return <p className="text-sm text-[var(--apple-text-secondary)]">无数据</p>;
 
-  const keys = Object.keys(data[0]).filter(k => k !== '_id');
-  const numericKey = keys.find(k => typeof data[0][k] === 'number') || keys[1];
-  const labelKey = keys.find(k => typeof data[0][k] === 'string') || keys[0];
+  const row0 = data[0];
+  const keys = Object.keys(row0).filter(k => k !== '_id');
+  if (keys.length === 0) return <p className="text-sm text-[var(--apple-text-secondary)]">无数据</p>;
+
+  // 数值列 / 标签列：避免仅有一列或列顺序异常时取 keys[1] 得到 undefined
+  const numericKey =
+    keys.find(k => typeof row0[k] === 'number') ??
+    keys.find(k => Number.isFinite(Number(row0[k])));
+  const labelKey =
+    keys.find(k => typeof row0[k] === 'string' && k !== numericKey) ??
+    keys.find(k => k !== numericKey) ??
+    keys[0];
+  const nk = numericKey ?? keys[0];
+  const lk = labelKey ?? keys[0];
+
+  const heading = title ? (
+    <p className="text-sm font-semibold mb-2">{title}</p>
+  ) : null;
 
   if (type === 'number') {
-    const val = data[0][numericKey] ?? data[0][Object.keys(data[0])[0]];
+    const val = row0[nk] ?? row0[keys[0]];
     return (
-      <div className="flex items-center justify-center h-32">
-        <span className="text-5xl font-bold text-[var(--apple-blue)]">{typeof val === 'number' ? val.toLocaleString() : val}</span>
+      <div>
+        {heading}
+        <div className="flex items-center justify-center h-32">
+          <span className="text-5xl font-bold text-[var(--apple-blue)]">{typeof val === 'number' ? val.toLocaleString() : val}</span>
+        </div>
       </div>
     );
   }
 
   if (type === 'pie') {
     return (
-      <ResponsiveContainer width="100%" height={280}>
-        <PieChart>
-          <Pie data={data} dataKey={numericKey} nameKey={labelKey} cx="50%" cy="50%" outerRadius={100}
-            label={({ [labelKey]: name, [numericKey]: val }) => `${name}: ${val}`}>
-            {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-          </Pie>
-          <Tooltip />
-        </PieChart>
-      </ResponsiveContainer>
+      <div>
+        {heading}
+        <ResponsiveContainer width="100%" height={280}>
+          <PieChart>
+            <Pie data={data} dataKey={nk} nameKey={lk} cx="50%" cy="50%" outerRadius={100}
+              label={({ [lk]: name, [nk]: val }) => `${name}: ${val}`}>
+              {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     );
   }
 
   if (type === 'line') {
     return (
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey={labelKey} tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} />
-          <Tooltip />
-          <Line type="monotone" dataKey={numericKey} stroke="var(--apple-blue)" strokeWidth={2} dot={false} />
-        </LineChart>
-      </ResponsiveContainer>
+      <div>
+        {heading}
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey={lk} tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip />
+            <Line type="monotone" dataKey={nk} stroke="var(--apple-blue)" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     );
   }
 
   if (type === 'bar') {
     return (
-      <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey={labelKey} tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} />
-          <Tooltip />
-          <Bar dataKey={numericKey} fill="var(--apple-blue)" radius={[6, 6, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+      <div>
+        {heading}
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey={lk} tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip />
+            <Bar dataKey={nk} fill="var(--apple-blue)" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     );
   }
 
   // table
   return (
-    <div className="overflow-x-auto max-h-72">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[var(--apple-border)]">
-            {keys.map(k => <th key={k} className="text-left py-2 px-3 font-medium text-[var(--apple-text-secondary)]">{k}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i} className="border-b border-[var(--apple-border)]/50">
-              {keys.map(k => <td key={k} className="py-2 px-3">{typeof row[k] === 'number' ? row[k].toLocaleString() : String(row[k] ?? '')}</td>)}
+    <div>
+      {heading}
+      <div className="overflow-x-auto max-h-72">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--apple-border)]">
+              {keys.map(k => <th key={k} className="text-left py-2 px-3 font-medium text-[var(--apple-text-secondary)]">{k}</th>)}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((row, i) => (
+              <tr key={i} className="border-b border-[var(--apple-border)]/50">
+                {keys.map(k => <td key={k} className="py-2 px-3">{typeof row[k] === 'number' ? row[k].toLocaleString() : String(row[k] ?? '')}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -157,6 +189,48 @@ function buildStorageKey(userId) {
   return `agent_history:${userId || 'anon'}`;
 }
 const MAX_PERSIST_MESSAGES = 100;
+
+function normalizeAssistantText(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function TextBlock({ text, className = '' }) {
+  const normalized = normalizeAssistantText(text);
+  if (!normalized) return null;
+  return (
+    <div className={`text-sm text-[var(--apple-text)] leading-6 break-words ${className}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p className="my-1 whitespace-pre-wrap">{children}</p>,
+          ul: ({ children }) => <ul className="list-disc pl-5 my-1 space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-5 my-1 space-y-1">{children}</ol>,
+          li: ({ children }) => <li>{children}</li>,
+          code: ({ inline, children }) =>
+            inline ? (
+              <code className="px-1 py-0.5 rounded bg-black/[0.06] text-[12px]">{children}</code>
+            ) : (
+              <code className="block p-2 rounded bg-black/[0.06] overflow-x-auto text-[12px]">{children}</code>
+            ),
+          pre: ({ children }) => <pre className="my-2">{children}</pre>,
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-2">
+              <table className="min-w-full text-xs border border-[var(--apple-border)]">{children}</table>
+            </div>
+          ),
+          th: ({ children }) => <th className="border border-[var(--apple-border)] px-2 py-1 text-left bg-black/[0.03]">{children}</th>,
+          td: ({ children }) => <td className="border border-[var(--apple-border)] px-2 py-1 align-top">{children}</td>,
+        }}
+      >
+        {normalized}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 export default function Agent() {
   const { user } = useAuth();
@@ -184,7 +258,6 @@ export default function Agent() {
     } catch {
       // 忽略解析失败
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   // 写回 localStorage（截断，避免无限膨胀）
@@ -328,25 +401,28 @@ export default function Agent() {
                   {Array.isArray(msg.sub_results) && msg.sub_results.length > 1 ? (
                     msg.sub_results.map((sr, si) => (
                       <div key={si} className="space-y-2 pt-2 border-t border-[var(--apple-border)] first:border-t-0 first:pt-0">
-                        <p className="text-xs text-[var(--apple-text-secondary)]">{sr.pipeline_explanation}</p>
+                        <p className="text-xs text-[var(--apple-text-secondary)] whitespace-pre-wrap break-words leading-5">
+                          {normalizeAssistantText(sr.pipeline_explanation)}
+                        </p>
                         {sr.chart_title && <p className="text-sm font-semibold">步骤 {si + 1}：{sr.chart_title}</p>}
-                        <ChartRenderer type={sr.chart_type} data={sr.data} title={sr.chart_title} />
-                        {sr.summary && <p className="text-sm text-[var(--apple-text)]">{sr.summary}</p>}
+                        <ChartRenderer type={sr.chart_type} data={sr.data} />
+                        <TextBlock text={sr.summary} />
                       </div>
                     ))
                   ) : (
                     <>
-                      <p className="text-xs text-[var(--apple-text-secondary)]">{msg.pipeline_explanation}</p>
-                      {msg.chart_title && <p className="text-sm font-semibold">{msg.chart_title}</p>}
+                      <p className="text-xs text-[var(--apple-text-secondary)] whitespace-pre-wrap break-words leading-5">
+                        {normalizeAssistantText(msg.pipeline_explanation)}
+                      </p>
                       <ChartRenderer type={msg.chart_type} data={msg.data} title={msg.chart_title} />
                     </>
                   )}
-                  {msg.summary && (
+                  {msg.summary && normalizeAssistantText(msg.summary) !== normalizeAssistantText(msg.pipeline_explanation) && (
                     <div className="mt-2 pt-2 border-t border-[var(--apple-border)]">
                       {(Array.isArray(msg.sub_results) && msg.sub_results.length > 1) || (Array.isArray(msg.decomposition) && msg.decomposition.length > 1) ? (
                         <p className="text-sm font-medium text-[var(--apple-text)]">综合解读</p>
                       ) : null}
-                      <p className="text-sm text-[var(--apple-text)] mt-1">{msg.summary}</p>
+                      <TextBlock text={msg.summary} className="mt-1" />
                     </div>
                   )}
                   {msg.trace && (
