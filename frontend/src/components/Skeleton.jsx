@@ -20,6 +20,7 @@ export function SkeletonCardGrid({ cols = 4, rows = 1, height = 96 }) {
         <div
           key={i}
           className="bg-white rounded-2xl p-4 shadow-sm border border-[var(--apple-border)]"
+          style={{ minHeight: height }}
         >
           <SkeletonBlock className="h-3 w-1/2 mb-3" />
           <SkeletonBlock className="h-7 w-3/4" />

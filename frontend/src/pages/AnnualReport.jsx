@@ -21,7 +21,6 @@ export default function AnnualReport() {
   const [selectedYear, setSelectedYear] = useState(null);
   const [topN, setTopN] = useState(10);
   const [ranking, setRanking] = useState([]);
-  const [repoNames, setRepoNames] = useState([]);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [yearlyTrend, setYearlyTrend] = useState({});
   const [loading, setLoading] = useState(false);
@@ -42,10 +41,11 @@ export default function AnnualReport() {
   };
 
   const fmtKpi = (n) => {
-    if (n == null) return '0';
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
-    return n.toFixed(0);
+    const x = Number(n);
+    if (!Number.isFinite(x)) return '0';
+    if (x >= 1_000_000) return (x / 1_000_000).toFixed(1) + 'M';
+    if (x >= 1_000) return (x / 1_000).toFixed(1) + 'k';
+    return x.toFixed(0);
   };
 
   useEffect(() => {
@@ -72,7 +72,6 @@ export default function AnnualReport() {
         { silent: true }
       );
       setRanking(data.ranking || []);
-      setRepoNames(data.repo_names || []);
       setMonthlyTrend(data.monthly_trend || []);
       setYearlyTrend(data.yearly_trend || {});
 
@@ -94,9 +93,11 @@ export default function AnnualReport() {
 
   const fmtNum = (n) => {
     if (n == null) return '—';
-    if (n >= 10000) return (n / 10000).toFixed(1) + '万';
-    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-    return n.toLocaleString();
+    const x = Number(n);
+    if (!Number.isFinite(x)) return '—';
+    if (x >= 10000) return (x / 10000).toFixed(1) + '万';
+    if (x >= 1000) return (x / 1000).toFixed(1) + 'k';
+    return x.toLocaleString();
   };
 
   const trendChartData = monthlyTrend
@@ -236,7 +237,9 @@ export default function AnnualReport() {
                     <th className="text-right py-3 px-3 font-medium text-[var(--apple-text-secondary)] hidden lg:table-cell">峰值</th>
                     <th className="text-right py-3 px-3 font-medium text-[var(--apple-text-secondary)] hidden lg:table-cell">OpenRank</th>
                     <th className="text-right py-3 px-3 font-medium text-[var(--apple-text-secondary)] hidden lg:table-cell">活跃度</th>
-                    <th className="text-right py-3 px-3 font-medium text-[var(--apple-text-secondary)] hidden xl:table-cell">🧑‍💻</th>
+                    <th className="text-right py-3 px-3 font-medium text-[var(--apple-text-secondary)] hidden xl:table-cell" title="参与者">
+                      贡献者
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -362,7 +365,7 @@ export default function AnnualReport() {
                   </LineChart>
                 </ResponsiveContainer>
                 <p className="text-[11px] text-[var(--apple-text-secondary)] mt-3">
-                  💡 点击排行榜中的项目行，或上方标签，可在趋势图中添加/移除项目。折线图展示各项目每月 Star 增量趋势。
+                  提示：点击排行榜中的项目行，或上方标签，可在趋势图中添加/移除项目。折线图展示各项目每月 Star 增量趋势。
                 </p>
               </div>
 

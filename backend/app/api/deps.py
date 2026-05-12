@@ -1,4 +1,5 @@
 """依赖注入：数据库、当前登录用户、管理员等。"""
+from datetime import timezone
 from typing import Annotated, Any
 
 import jwt
@@ -57,6 +58,11 @@ async def get_current_user(
     pwd_changed = user.get("password_changed_at")
     if iat is not None and pwd_changed is not None:
         try:
+            # 真实 MongoDB（pymongo 默认 tz_aware=False）返回的 datetime 是 naive，
+            # 但实际表示 UTC 时间；若直接调用 .timestamp() 会按本地时区解释，导致 token
+            # 失效判定窗口出现时区偏差。这里若发现无 tzinfo 即按 UTC 补全。
+            if pwd_changed.tzinfo is None:
+                pwd_changed = pwd_changed.replace(tzinfo=timezone.utc)
             pwd_changed_ts = int(pwd_changed.timestamp())
             if int(iat) < pwd_changed_ts:
                 raise credentials_exc

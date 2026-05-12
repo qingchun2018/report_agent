@@ -210,13 +210,22 @@ function TextBlock({ text, className = '' }) {
           ul: ({ children }) => <ul className="list-disc pl-5 my-1 space-y-1">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal pl-5 my-1 space-y-1">{children}</ol>,
           li: ({ children }) => <li>{children}</li>,
-          code: ({ inline, children }) =>
-            inline ? (
-              <code className="px-1 py-0.5 rounded bg-black/[0.06] text-[12px]">{children}</code>
+          code: ({ children, className }) => {
+            // react-markdown v9+ 已不再透传 inline 属性；块级 code（围栏代码）由 <pre> 包裹，
+            // 通常带有 language-xxx 的 className 或内容含换行；其余视为行内 code。
+            const text = typeof children === 'string' ? children : '';
+            const isBlock = Boolean(className) || text.includes('\n');
+            return isBlock ? (
+              <code className={`text-[12px] ${className || ''}`.trim()}>{children}</code>
             ) : (
-              <code className="block p-2 rounded bg-black/[0.06] overflow-x-auto text-[12px]">{children}</code>
-            ),
-          pre: ({ children }) => <pre className="my-2">{children}</pre>,
+              <code className="px-1 py-0.5 rounded bg-black/[0.06] text-[12px]">{children}</code>
+            );
+          },
+          pre: ({ children }) => (
+            <pre className="my-2 p-2 rounded bg-black/[0.06] overflow-x-auto text-[12px]">
+              {children}
+            </pre>
+          ),
           table: ({ children }) => (
             <div className="overflow-x-auto my-2">
               <table className="min-w-full text-xs border border-[var(--apple-border)]">{children}</table>

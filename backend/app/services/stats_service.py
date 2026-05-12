@@ -619,6 +619,10 @@ class StatsService:
         current_docs = await self.db.annual_reports.find(query_current, {"_id": 0}).to_list(None)
         prev_docs = await self.db.annual_reports.find(query_prev, {"_id": 0}).to_list(None)
 
+        # MongoDB 的 find 不保证返回顺序；环比（MoM）依赖按月份升序遍历，
+        # 否则 months_data[-1] 取到的不是上一个月，会得到错误的环比值。
+        current_docs.sort(key=lambda d: int(d.get("month", 0) or 0))
+
         prev_map = {}
         for d in prev_docs:
             prev_map[(d["metric_key"], d["month"])] = d["value"]

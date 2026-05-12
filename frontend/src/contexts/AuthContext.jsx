@@ -5,7 +5,8 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // 无 token 时不进入加载态；有 token 时需等待 /me 结束后再渲染受保护路由
+  const [loading, setLoading] = useState(() => !!tokenStore.get());
 
   // 401 时清空本地登录态，由路由守卫自动跳转登录页
   useEffect(() => {
@@ -16,10 +17,7 @@ export function AuthProvider({ children }) {
   // 启动时若本地有 token，尝试拉取当前用户验证有效性
   useEffect(() => {
     const token = tokenStore.get();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
     apiJson('/api/auth/me', { silent: true })
       .then((u) => setUser(u))
       .catch(() => {

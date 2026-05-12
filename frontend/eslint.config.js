@@ -26,4 +26,23 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  // Context 与 Toast：除 Provider 外导出 hook / 全局发射器，需在 Fast Refresh 规则中放行名称
+  {
+    files: ['src/contexts/**/*.{js,jsx}', 'src/components/Toast.jsx'],
+    rules: {
+      'react-refresh/only-export-components': [
+        'error',
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            'useAuth',
+            'useTheme',
+            'useToast',
+            'bindToastEmitter',
+            'emitToast',
+          ],
+        },
+      ],
+    },
+  },
 ])
